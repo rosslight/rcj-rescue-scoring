@@ -20,7 +20,6 @@ jobs:
         with:
           node-version: 18.x
       - run: npm install
-      - run: npm run minify
       - run: npm run build
       - run: rm node_modules -R
 
