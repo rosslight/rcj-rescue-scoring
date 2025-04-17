@@ -449,6 +449,50 @@ const tileTypes = [
     "_id"          : "58cfd29b204466244ba56a1f"
   },
   {
+    "image"        : "roundabout-south.png",
+    "gaps"         : 0,
+    "intersections": 1,
+    "seesaw"       : 0,
+    "paths"        : {
+      "bottom"  : "bottom"
+    },
+    "_id"          : "570c27c3f5aadabe23f3afa0"
+  },
+  {
+    "image"        : "roundabout-east.png",
+    "gaps"         : 0,
+    "intersections": 1,
+    "seesaw"       : 0,
+    "paths"        : {
+      "right"  : "right"
+    },
+    "_id"          : "570c27c3f6aadabe23f3afa1"
+  },
+  {
+    "image"        : "roundabout-without.png",
+    "gaps"         : 0,
+    "intersections": 2,
+    "seesaw"       : 0,
+    "paths"        : {
+      "bottom"  : "right",
+      "right"  : "bottom"
+
+    },
+    "_id"          : "570c27c3f6aadabe23f3afa0"
+  },
+  {
+    "image"        : "corner.png",
+    "gaps"         : 0,
+    "intersections": 1,
+    "seesaw"       : 0,
+    "paths"        : {
+      "left"  : "right",
+      "right"  : "left"
+
+    },
+    "_id"          : "570c28c3f6aadabe23f3afa0"
+  },
+  {
     "image"        : "tile-17.png",
     "gaps"         : 0,
     "intersections": 0,
