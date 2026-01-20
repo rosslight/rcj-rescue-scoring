@@ -705,6 +705,25 @@ app.controller('ddController', ['$scope', '$uibModal', '$log', '$timeout', '$htt
 
     });
 
+    if (timeIncrement) {
+        // Increment timer in every second (setInterval)
+        setInterval(function () {
+            if ($scope.minutes < 8 && $scope.status == 2) {
+                if ($scope.seconds < 59) {
+                    $scope.seconds++;
+                } else {
+                    $scope.seconds = 0;
+                    if ($scope.minutes < 59) {
+                        $scope.minutes++;
+                    } else {
+                        $scope.minutes = 0;
+                    }
+                }
+            }
+            $scope.$apply();
+        }, 1000);
+    }
+
 
 }]).directive("tileLoadFinished", ['$timeout', function ($timeout) {
     return function (scope, element, attrs) {

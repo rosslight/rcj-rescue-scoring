@@ -607,10 +607,12 @@
             "super": "Super Admin role",
             "admin": "Admin role",
             "password": "Password",
+            "email": "Email",
             "authoritySuper": "Grant Super Admin role",
             "authorityAdmin": "Grant Admin role",
             "authorization": "Grant",
-            "add": "Add User"
+            "add": "Add User",
+            "emailNotification": "Email notification"
         },
         "competition": {
             "title": "Admin console",
@@ -934,6 +936,7 @@
             "select4": "Select Room 4 Tiles (Anything)",
             "pick4": "Select Room 4 Configuration",
             "innerTile": "Inner Tile Walls",
+
             "js":{
                 "startTileError": "Please set the start tile."
             }

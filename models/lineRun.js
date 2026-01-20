@@ -29,6 +29,7 @@ const lineRunSchema = new Schema({
   map               : {type: ObjectId, ref: 'LineMap', required: true, index: true},
   group             : {type: Number, min: 0},
   normalizationGroup: {type: String, index: true},
+  adjustment        : {type: Number, default: 0, min: -100},
 
   tiles             : [{
     type: new Schema({

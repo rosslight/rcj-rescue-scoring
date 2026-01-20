@@ -15,9 +15,9 @@ function imageUpload(imageDataUrl, type, imageData) {
 
     imageData
     .minify({
-      maxWidth: 20000,
+      maxWidth: 2000,
       maxHeight: 2000,
-      quality: 1,
+      quality: 0.7,
     })
     .then((miniImageData) => {
       const file = miniImageData.toFile()
@@ -33,16 +33,10 @@ function imageUpload(imageDataUrl, type, imageData) {
             contentType: false,
             timeout: 5000
         })
-        .done(async function(data) {
-            let dataUrl = data.url;
-            const index =
-                (quill.getSelection() || {}).index || quill.getLength();
-                quill.insertEmbed(index, 'image', dataUrl, 'user');
-
-            let dimentions = await getImageDimensions(dataUrl)
-            if (dimentions.w > maxWidth) {
-                quill.formatText(index, 1, 'width', `${maxWidth}px`);
-            }  
+        .done(function(res) {
+            let imageUrl = res.url;
+            const index = (quill.getSelection() || {}).index || quill.getLength();
+            quill.insertEmbed(index, 'image', imageUrl, 'user');
             Swal.close()
         })
         .fail(function() {
@@ -158,6 +152,12 @@ app.controller('DocumentFormController', ['$scope', '$uibModal', '$log', '$http'
         position: 'top-end',
         showConfirmButton: false,
         timer: 3000
+    });
+
+    const NotificationToast = Swal.mixin({
+        toast: true,
+        position: 'top',
+        showConfirmButton: true
     });
 
     let saved_mes;
@@ -488,7 +488,7 @@ app.controller('DocumentFormController', ['$scope', '$uibModal', '$log', '$http'
     }
 
     $scope.contentChanged = function (editor, questionId, maxLength) {
-        $scope.contentLength[questionId] = editor.getLength();
+        $scope.contentLength[questionId] = editor.getLength() - 1;
         if (maxLength) {
             editor.deleteText(maxLength - 1, editor.getLength());
         }
@@ -497,4 +497,102 @@ app.controller('DocumentFormController', ['$scope', '$uibModal', '$log', '$http'
     $scope.totalLength = function() {
         return Object.values($scope.contentLength).reduce((total, length) => total + length, 0);
     };
+
+    let notified = null;
+    let notification = setInterval(function() {
+        const unixTime = new Date().getTime() / 1000;
+        const diff = deadline - unixTime;
+        if (diff <= 0) {
+            if (notified != "0") {
+                NotificationToast.fire({
+                    type: 'warning',
+                    title: "Caution",
+                    html: "<b>The submission deadline has passed.</b> No further updates will be accepted."
+                })
+                notified = "0"
+                clearInterval(notification);
+            }
+        } else if (diff <= 30) {
+            if (notified != "30") {
+                NotificationToast.fire({
+                    type: 'warning',
+                    title: "Caution",
+                    html: "<b>The submission deadline is in just 30 seconds.</b> Please save your work immediately!"
+                })
+                notified = "30"
+            }
+        } else if (diff <= 60) {
+            if (notified != "60") {
+                NotificationToast.fire({
+                    type: 'warning',
+                    title: "Caution",
+                    html: "<b>The submission deadline is in just 60 seconds.</b> Please save your work immediately!"
+                })
+                notified = "60"
+            }
+        } else if (diff <= 120) {
+            if (notified != "120") {
+                NotificationToast.fire({
+                    type: 'warning',
+                    title: "Caution",
+                    html: "<b>The submission deadline is in just 2 minutes.</b> Please save your work immediately!"
+                })
+                notified = "120"
+            }
+        } else if (diff <= 180) {
+            if (notified != "180") {
+                NotificationToast.fire({
+                    type: 'warning',
+                    title: "Caution",
+                    html: "<b>The submission deadline is in just 3 minutes.</b> Please save your work immediately!"
+                })
+                notified = "180"
+            }
+        } else if (diff <= 240) {
+            if (notified != "240") {
+                NotificationToast.fire({
+                    type: 'warning',
+                    title: "Caution",
+                    html: "<b>The submission deadline is in just 4 minutes.</b> Please save your work immediately!"
+                })
+                notified = "240"
+            }
+        } else if (diff <= 300) {
+            if (notified != "300") {
+                NotificationToast.fire({
+                    type: 'warning',
+                    title: "Caution",
+                    html: "<b>The submission deadline is in 5 minutes.</b> Please complete your work immediately!"
+                })
+                notified = "300"
+            }
+        } else if (diff <= 600) {
+            if (notified != "600") {
+                NotificationToast.fire({
+                    type: 'warning',
+                    title: "Caution",
+                    html: "<b>The submission deadline is in 10 minutes.</b> Please complete your work immediately!"
+                })
+                notified = "600"
+            }
+        } else if (diff <= 3600) {
+            if (notified != "3600") {
+                NotificationToast.fire({
+                    type: 'warning',
+                    title: "Caution",
+                    html: "<b>The submission deadline is in 1 hour.</b> Please complete your work as soon as possible!"
+                })
+                notified = "3600"
+            }
+        } else if (diff <= 10800) {
+            if (notified != "10800") {
+                NotificationToast.fire({
+                    type: 'warning',
+                    title: "Caution",
+                    html: "<b>The submission deadline is in 3 hours.</b> Please complete your work as soon as possible!"
+                })
+                notified = "10800"
+            }
+        }
+    }, 1000);
 }]);

@@ -20,6 +20,7 @@ const simRunSchema = new Schema({
   field             : {type: ObjectId, ref: 'Field', required: true, index: true},
   team              : {type: ObjectId, ref: 'Team', required: false, index: true},
   normalizationGroup: {type: String, index: true},
+  adjustment        : {type: Number, default: 0, min: -100},
   score             : {type: Number, min: -1000, default: 0},
   time              : {
     minutes: {type: Number, min: 0, max: 10, default: 0},

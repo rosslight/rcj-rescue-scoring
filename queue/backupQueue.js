@@ -21,7 +21,7 @@ const logger = require('../config/logger').mainLogger;
 const glob = require('glob');
 const path = require('path')
 
-const Bversion = "24.0";
+const Bversion = "25.0";
 
 const b_interval = process.env.BACKUP_INTERVAL_HOUR;
 const b_keep = process.env.BACKUP_KEEP_VERSION;
@@ -37,10 +37,11 @@ const backupQueue = new Queue('backup', {
 backupQueue.obliterate({ force: true });
 
 backupQueue.process('backup', function(job, done){
-  const {competitionId, mode} = job.data;
+  const {competitionId, fullBackup, mode} = job.data;
   const folderName = Math.floor( new Date().getTime() / 1000 );
   let prefix = "";
-  if (mode == 'auto') prefix = "_";
+  if (mode == 'auto') prefix += "AUTO_";
+  if (fullBackup) prefix += "FULL_"
   const folderPathTmp = `./backupTmp/${prefix}${folderName}`;
   const dstPath = `./backup/${competitionId}/${prefix}${folderName}.cms`;
   fs.mkdirsSync(folderPathTmp);
@@ -68,30 +69,22 @@ backupQueue.process('backup', function(job, done){
     }
   });
 
-  // Copy Document Folder
-  fs.copy(`./documents/${competitionId}`, `${folderPathTmp}/documents`, (err) => {
-    if(err){
-      done(new Error(err));
-    }else{
-      glob.glob(`${folderPathTmp}/documents/**/trash/*`, function(err, trash){
-        trash.forEach(function(file){
-          fs.unlinkSync(file);
-        });
-        outputCount ++;
-        jobProgress += 50/maxCount;
-        job.progress(Math.floor(jobProgress));
-        if(outputCount == maxCount){
-          makeZip(job, done, dstPath, folderPathTmp);
+  function backupDir(source, dest) {
+    if (fs.existsSync(source)) {
+      // Copy Mail Attachment Folder
+      fs.copy(source, dest, (err) => {
+        if(err){
+          done(new Error(err));
+        }else{
+          outputCount ++;
+          jobProgress += 50/maxCount;
+          job.progress(Math.floor(jobProgress));
+          if(outputCount == maxCount){
+            makeZip(job, done, dstPath, folderPathTmp);
+          }
         }
       });
-    }
-  });
-
-  // Copy Cabinet Folder
-  fs.copy(`./cabinet/${competitionId}`, `${folderPathTmp}/cabinet`, (err) => {
-    if(err){
-      done(new Error(err));
-    }else{
+    } else {
       outputCount ++;
       jobProgress += 50/maxCount;
       job.progress(Math.floor(jobProgress));
@@ -99,43 +92,15 @@ backupQueue.process('backup', function(job, done){
         makeZip(job, done, dstPath, folderPathTmp);
       }
     }
-  });
+  }
 
-  // Copy Suevey Folder
-  fs.copy(`./survey/${competitionId}`, `${folderPathTmp}/survey`, (err) => {
-    if(err){
-      done(new Error(err));
-    }else{
-      outputCount ++;
-      jobProgress += 50/maxCount;
-      job.progress(Math.floor(jobProgress));
-      if(outputCount == maxCount){
-        makeZip(job, done, dstPath, folderPathTmp);
-      }
-    }
-  });
-  
-  if (fs.existsSync(`./mailAttachment/${competitionId}`)) {
-    // Copy Mail Attachment Folder
-    fs.copy(`./mailAttachment/${competitionId}`, `${folderPathTmp}/mailAttachment`, (err) => {
-      if(err){
-        done(new Error(err));
-      }else{
-        outputCount ++;
-        jobProgress += 50/maxCount;
-        job.progress(Math.floor(jobProgress));
-        if(outputCount == maxCount){
-          makeZip(job, done, dstPath, folderPathTmp);
-        }
-      }
-    });
+  if (fullBackup) {
+    backupDir(`./documents/${competitionId}`, `${folderPathTmp}/documents`);
+    backupDir(`./cabinet/${competitionId}`, `${folderPathTmp}/cabinet`);
+    backupDir(`./survey/${competitionId}`, `${folderPathTmp}/survey`);
+    backupDir(`./mailAttachment/${competitionId}`, `${folderPathTmp}/mailAttachment`);
   } else {
-    outputCount ++;
-    jobProgress += 50/maxCount;
-    job.progress(Math.floor(jobProgress));
-    if(outputCount == maxCount){
-      makeZip(job, done, dstPath, folderPathTmp);
-    }
+    outputCount += 4;
   }
 
   //Competition data
@@ -173,9 +138,20 @@ backupQueue.process('backup', function(job, done){
       let users = data.filter(d => 
         d.superDuperAdmin ||
         d.competitions.some(dd => 
-          dd.id.toString() == competitionId && dd.accessLevel > 0
+          dd.id.toString() == competitionId && (dd.accessLevel > 0 || dd.role && dd.role.length > 0)
         )
-      )
+      ).map (d => { // Only keep own competition access
+        return {
+          _id: d._id,
+          username: d.username,
+          password: d.password,
+          salt: d.salt,
+          email: d.email,
+          admin: d.admin,
+          superDuperAdmin: d.superDuperAdmin,
+          competitions: d.competitions.filter(dd => dd.id.toString() == competitionId)
+        }
+      })
       fs.writeFile(`${folderPathTmp}/users.json`, JSON.stringify(users), (err) => {
         if(err){
           done(new Error(err));
@@ -363,9 +339,41 @@ backupQueue.process('restore', function(job, done){
             accumulator = await accumulator;
             if (fileName == "users") {
               let exist = await userdb.user.findOne({username: currentValue.username}).exec();
-              if (exist && !exist._id.equals(currentValue._id)) {
-                console.log(`Skip import for user: ${currentValue.username}`);
+              if (exist && exist._id.toString() == currentValue._id) {
+                console.log(`Found the user: ${currentValue.username}, update competition access level`);
+                exist.competitions = exist.competitions.filter(c => c != null && c.id != null);
+                if(exist.competitions.some(c => c.id.toString() == competition[0]._id)){
+                  for(let c of exist.competitions){
+                    if(c.id.toString() == competition[0]._id) {
+                      console.log(`Updated existing competition access level.`);
+                      let competitionAccess = currentValue.competitions.find(cc => cc.id.toString() == competition[0]._id);
+                      if (competitionAccess) {
+                        c.accessLevel = competitionAccess.accessLevel;
+                        c.role = competitionAccess.role;
+                      } else {
+                        accumulator;
+                      }
+                    }
+                  }
+                } else {
+                  console.log(`Added new competition access level.`);
+                  exist.competitions.push(currentValue.competitions[0]);
+                }
+                accumulator.push(
+                  {
+                    updateOne: {
+                        filter: {_id: currentValue._id},
+                        update: {
+                          competitions: exist.competitions
+                        }, 
+                        upsert: true
+                    }
+                  }
+                );
                 return accumulator;
+              } else if (exist && exist._id.toString() != currentValue._id) {
+                console.log(`Found the user: ${currentValue.username}, but the ID is different, add prefix to username then register as new user.`);
+                currentValue.username = `${currentValue.username}_restored_${Math.floor( new Date().getTime() / 1000 )}`;
               }
             }
             accumulator.push(
@@ -422,99 +430,42 @@ backupQueue.process('restore', function(job, done){
       restore('surveyAnswer', surveyDb.surveyAnswer);
       restore('users', userdb.user);
 
-      // Copy Document Folder
-      fs.copy(`${base_tmp_path}uploads/${folder}/documents`, `${__dirname}/../documents/${competition[0]._id}`, (err) => {
-        chmodr(
-          `${__dirname}/../documents/${competition[0]._id}`,
-          0o777,
-          (err) => {
-            if (err) {
-              done(new Error(err));
-            }else{
-              updated ++;
-              jobProgress += 50/maxCount;
-              job.progress(Math.floor(jobProgress));
-              if(updated == maxCount){
-                job.progress(100);
-                done();
-              }
-            }
-          }
-        );
-      });
-
-      // Copy Cabinet Folder
-      fs.copy(`${base_tmp_path}uploads/${folder}/cabinet`, `${__dirname}/../cabinet/${competition[0]._id}`, (err) => {
-        chmodr(
-          `${__dirname}/../cabinet/${competition[0]._id}`,
-          0o777,
-          (err) => {
-            if (err) {
-              done(new Error(err));
-            }else{
-              updated ++;
-              jobProgress += 50/maxCount;
-              job.progress(Math.floor(jobProgress));
-              if(updated == maxCount){
-                job.progress(100);
-                done();
-              }
-            }
-          }
-        );
-      });
-
-      // Copy Survey Folder
-      fs.copy(`${base_tmp_path}uploads/${folder}/survey`, `${__dirname}/../survey/${competition[0]._id}`, (err) => {
-        chmodr(
-          `${__dirname}/../survey/${competition[0]._id}`,
-          0o777,
-          (err) => {
-            if (err) {
-              done(new Error(err));
-            }else{
-              updated ++;
-              jobProgress += 50/maxCount;
-              job.progress(Math.floor(jobProgress));
-              if(updated == maxCount){
-                job.progress(100);
-                done();
-              }
-            }
-          }
-        );
-      });
-
-      // Copy MailAttachment Folder
-      if (fs.existsSync(`${base_tmp_path}uploads/${folder}/mailAttachment`)) {
-        fs.copy(`${base_tmp_path}uploads/${folder}/mailAttachment`, `${__dirname}/../mailAttachment/${competition[0]._id}`, (err) => {
-          chmodr(
-            `${__dirname}/../mailAttachment/${competition[0]._id}`,
-            0o777,
-            (err) => {
-              if (err) {
-                done(new Error(err));
-              }else{
-                updated ++;
-                jobProgress += 50/maxCount;
-                job.progress(Math.floor(jobProgress));
-                if(updated == maxCount){
-                  job.progress(100);
-                  done();
+      function restoreDir(source, dest) {
+        if (fs.existsSync(source)) {
+          fs.copy(source, dest, (err) => {
+            chmodr(
+              dest,
+              0o777,
+              (err) => {
+                if (err) {
+                  done(new Error(err));
+                }else{
+                  updated ++;
+                  jobProgress += 50/maxCount;
+                  job.progress(Math.floor(jobProgress));
+                  if(updated == maxCount){
+                    job.progress(100);
+                    done();
+                  }
                 }
               }
-            }
-          );
-        });
-      } else {
-        updated ++;
-        jobProgress += 50/maxCount;
-        job.progress(Math.floor(jobProgress));
-        if(updated == maxCount){
-          job.progress(100);
-          done();
+            );
+          });
+        } else {
+          updated ++;
+          jobProgress += 50/maxCount;
+          job.progress(Math.floor(jobProgress));
+          if(updated == maxCount){
+            job.progress(100);
+            done();
+          }
         }
       }
+
+      restoreDir(`${base_tmp_path}uploads/${folder}/documents`, `${__dirname}/../documents/${competition[0]._id}`);
+      restoreDir(`${base_tmp_path}uploads/${folder}/cabinet`, `${__dirname}/../cabinet/${competition[0]._id}`);
+      restoreDir(`${base_tmp_path}uploads/${folder}/survey`, `${__dirname}/../survey/${competition[0]._id}`);
+      restoreDir(`${base_tmp_path}uploads/${folder}/mailAttachment`, `${__dirname}/../mailAttachment/${competition[0]._id}`);
       
       userdb.user.findById(user._id).exec(function (err, dbUser) {
         if (err) {
@@ -576,6 +527,7 @@ if (b_interval && b_interval != 0) {
             for (let d of data) {
               backupQueue.add('backup',{
                 'competitionId': d._id,
+                'fullBackup': false,
                 'mode': 'auto'
               });
             }

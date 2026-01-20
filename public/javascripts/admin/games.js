@@ -173,11 +173,46 @@ app.controller('RunAdminController', ['$scope', '$http', '$log', '$location', 'U
 
 
         }
+
+        $scope.editMode = false;
+        let previousContents = null;
+        $scope.toggleEdit = function(){
+            $scope.editMode = !$scope.editMode;
+            if ($scope.editMode) {
+                // Copy previous contents
+                previousContents = [];
+            } else {
+                let updates = [];
+                for (let r of $scope.runs) {
+                    let prvC = previousContents.find((c) => c._id == r._id);
+                    console.log(prvC)
+                    if (prvC == undefined || prvC.adjustment != r.adjustment) {
+                        // Updated
+                        updates.push(
+                            {
+                                _id: r._id,
+                                adjustment: Number(r.adjustment)
+                            }
+                        );
+                    }
+                }
+
+                if (updates.length > 0) {
+                    $http.put(`/api/runs/${$scope.league.type}/bulk`, updates).then(function (response) {
+                        updateRunList()
+                    }, function (error) {
+                        console.log(error)
+                    })
+                }
+            }
+        }
         
         var showAllRounds = true
         var showAllFields = true
         var showAllTeams = true
+        var showAllTeamCodes = true
         $scope.teamName = ""
+        $scope.teamCode = ""
 
         $scope.$watch('Rrounds', function (newValue, oldValue) {
             showAllRounds = true
@@ -203,6 +238,11 @@ app.controller('RunAdminController', ['$scope', '$http', '$log', '$location', 'U
                 }
             }
         }, true)
+        $scope.$watch('teamCode', function (newValue, oldValue) {
+            if (newValue == '') showAllTeamCodes = true
+            else showAllTeamCodes = false
+            return
+        }, true)
         $scope.$watch('teamName', function (newValue, oldValue) {
             if (newValue == '') showAllTeams = true
             else showAllTeams = false
@@ -211,7 +251,7 @@ app.controller('RunAdminController', ['$scope', '$http', '$log', '$location', 'U
 
         $scope.list_filter = function (value, index, array) {
             return (showAllRounds || $scope.Rrounds[value.round.name]) &&
-                (showAllFields || $scope.Rfields[value.field.name]) && (showAllTeams || ~value.team.name.indexOf($scope.teamName))
+                (showAllFields || $scope.Rfields[value.field.name]) && (showAllTeams || ~value.team.name.indexOf($scope.teamName)) && (showAllTeamCodes || ~value.team.teamCode.indexOf($scope.teamCode))
         }
         
         function objectSort(object) {
@@ -330,8 +370,9 @@ app.controller('RunAdminController', ['$scope', '$http', '$log', '$location', 'U
         }
 
         $scope.go = function (path) {
-            path = path + '?return=' + window.location.pathname;
-            window.location = path
+            const separator = path.includes('?') ? '&' : '?';
+            path = path + separator + 'return=' + encodeURIComponent(window.location.pathname);
+            window.location = path;
         }
 
         $scope.format = "yyyy-MM-dd"
@@ -416,7 +457,7 @@ app.controller('RunAdminController', ['$scope', '$http', '$log', '$location', 'U
                 $('.loader').remove();
             }
         }
-    }])
+    }]);
 
 
 $(window).on('beforeunload', function () {

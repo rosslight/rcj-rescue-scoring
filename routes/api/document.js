@@ -22,6 +22,7 @@ const ffmpeg = require('fluent-ffmpeg');
 
 const competitiondb = require('../../models/competition');
 const { LEAGUES_JSON } = competitiondb;
+const {sendMail} = require('../../helper/mailSender');
 
 const dateformat = require('dateformat');
 let read = require('fs-readdir-recursive');
@@ -1724,6 +1725,7 @@ privateRouter.get('/map/:fileName',
 );
 
 async function extractReviewAssignInfo(data, teamData, userId) {
+  const competitionLvlDeadline = data.documents.deadline;
   let assignResult = {};
   for (let league of data.documents.leagues) {
     let teamsTmp = {};
@@ -1732,6 +1734,7 @@ async function extractReviewAssignInfo(data, teamData, userId) {
     let teamDataLeague = teamData.filter((t) => t.league == leagueId);
     if (!review) continue;
     for (let r of review) {
+      const reviewItemTitle = r.i18n[0].title;
       let totalScaleQuestionNum = r.questions.filter((q) => q.type == 'scale' && q.required).length;
       let questionIds = r.questions.filter((q) => q.type == 'scale' && q.required).map((q) => q._id);
       let assignedReviewers = r.assignedReviewers;
@@ -1747,11 +1750,14 @@ async function extractReviewAssignInfo(data, teamData, userId) {
               region: td.country,
               assienedQuestionsNum: totalScaleQuestionNum,
               answeredQuestionsNum: 0,
-              assignedQuestionIds: questionIds
+              assignedQuestionIds: questionIds,
+              deadline: Math.max(competitionLvlDeadline, td.document.deadline),
+              reviewItems: [reviewItemTitle]
             }
           } else {
             teamsTmp[td._id].assienedQuestionsNum += totalScaleQuestionNum;
             teamsTmp[td._id].assignedQuestionIds = teamsTmp[td._id].assignedQuestionIds.concat(questionIds);
+            teamsTmp[td._id].reviewItems.push(reviewItemTitle);
           }
         }
       } else {
@@ -1769,11 +1775,14 @@ async function extractReviewAssignInfo(data, teamData, userId) {
                   region: td.country,
                   assienedQuestionsNum: totalScaleQuestionNum,
                   answeredQuestionsNum: 0,
-                  assignedQuestionIds: questionIds
+                  assignedQuestionIds: questionIds,
+                  deadline: Math.max(competitionLvlDeadline, td.document.deadline),
+                  reviewItems: [reviewItemTitle]
                 }
               } else {
                 teamsTmp[td._id].assienedQuestionsNum += totalScaleQuestionNum;
                 teamsTmp[td._id].assignedQuestionIds = teamsTmp[td._id].assignedQuestionIds.concat(questionIds);
+                teamsTmp[td._id].reviewItems.push(reviewItemTitle);
               }
             }
           } else {
@@ -1788,11 +1797,14 @@ async function extractReviewAssignInfo(data, teamData, userId) {
                   region: td.country,
                   assienedQuestionsNum: totalScaleQuestionNum,
                   answeredQuestionsNum: 0,
-                  assignedQuestionIds: questionIds
+                  assignedQuestionIds: questionIds,
+                  deadline: Math.max(competitionLvlDeadline, td.document.deadline),
+                  reviewItems: [reviewItemTitle]
                 }
               } else {
                 teamsTmp[td._id].assienedQuestionsNum += totalScaleQuestionNum;
                 teamsTmp[td._id].assignedQuestionIds = teamsTmp[td._id].assignedQuestionIds.concat(questionIds);
+                teamsTmp[td._id].reviewItems.push(reviewItemTitle);
               }
             }
           }
@@ -1836,7 +1848,7 @@ privateRouter.get('/:competitionId/assigned', async function (req, res, next) {
       .find({
         competition: competitionId
       })
-      .select('name teamCode league country')
+      .select('name teamCode league country document.deadline')
       .lean()
       .exec(function (err, teamData) {
         if (err || !teamData) {
@@ -1875,6 +1887,8 @@ privateRouter.get('/:competitionId/assigned', async function (req, res, next) {
 
 adminRouter.get('/:competitionId/reviewStatus', async function (req, res, next) {
   const { competitionId } = req.params;
+  const { sendReminder } = req.query;
+
   if (!ObjectId.isValid(competitionId)) {
     return next();
   }
@@ -1886,6 +1900,7 @@ adminRouter.get('/:competitionId/reviewStatus', async function (req, res, next) 
   )) {
     userdb.user
       .find({})
+      .select('_id username competitions email')
       .lean()
       .exec(function (err, data) {
         if (err) {
@@ -1902,7 +1917,8 @@ adminRouter.get('/:competitionId/reviewStatus', async function (req, res, next) 
               if (comp.role.includes("INTERVIEW")) {
                 userList.push({
                   userId: u._id,
-                  userName: u.username
+                  userName: u.username,
+                  email: u.email
                 });
               }
             }
@@ -1911,7 +1927,7 @@ adminRouter.get('/:competitionId/reviewStatus', async function (req, res, next) 
             .find({
               competition: competitionId
             })
-            .select('name teamCode league country')
+            .select('name teamCode league country document.deadline')
             .lean()
             .exec(function (err, teamData) {
               if (err || !teamData) {
@@ -1939,6 +1955,28 @@ adminRouter.get('/:competitionId/reviewStatus', async function (req, res, next) 
                           userName: user.userName,
                           assignedTeams: assignResult
                         })
+                        if (sendReminder && user.email && Object.values(assignResult).flat().some(a => a.assienedQuestionsNum != a.answeredQuestionsNum)) {
+                          let pendingList = "";
+                          let completedList = "";
+                          for (let team of Object.values(assignResult).flat()) {
+                            let txt = `<li>[${team.league}] ${team.code} ${team.name} &nbsp;&nbsp;&nbsp;| ${team.reviewItems.join(" / ")} | Review Progress: ${team.answeredQuestionsNum}/${team.assienedQuestionsNum}</li>`;
+                            if (team.assienedQuestionsNum != team.answeredQuestionsNum) {
+                              pendingList += txt;
+                            } else {
+                              completedList += txt;
+                            }
+                          }
+                          const variables = {
+                            userName: user.userName,
+                            competitionName: data.name,
+                            evaluationHome: `${process.env.CMS_PROTOCOL}://${process.env.CMS_HOSTNAME}/document/assigned/${competitionId}`,
+                            pendingList: `<ul>${pendingList}</ul>`,
+                            completedList: `<ul>${completedList}</ul>`
+                          };
+                          const subject = "Document Evaluation Reminder & Status Update";
+                          const templateName = "_Document Evaluation Reminder and Status Update";
+                          sendMail(subject, templateName, "", variables, user.email);
+                        }
                       }
                       
                       res.status(200).send({

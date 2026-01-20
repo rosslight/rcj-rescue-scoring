@@ -94,6 +94,10 @@ html(ng-app="RunAdmin")
                 input(type='checkbox' ng-model='showField' id="showField")
                 label.checkbox(for="showField") Field
                 input(type='checkbox' ng-model='showScore' id="showScore")
+                input(type='checkbox' ng-model='showOriginalScore' id="showOriginalScore")
+                label.checkbox(for="showOriginalScore") Original Score
+                input(type='checkbox' ng-model='showAdjustment' id="showAdjustment")
+                label.checkbox(for="showAdjustment") Adjustment
                 label.checkbox(for="showScore") Score
                 input(type='checkbox' ng-model='showNormalizedScore' id="showNormalizedScore")
                 label.checkbox(for="showNormalizedScore") Normalized score
@@ -119,6 +123,8 @@ html(ng-app="RunAdmin")
               th(ng-if="showCode") Team code
               th(ng-if="showTeam") {{"common.team" | translate}}
               th(ng-if="showField") {{"common.field" | translate}}
+              th(ng-if="showOriginalScore") Original Score
+              th(ng-if="showAdjustment") Adjustment
               th(ng-if="showScore") {{"common.score" | translate}}
               th(ng-if="showNormalizedScore") {{"common.normalizedScore" | translate}}
               th(ng-if="showTime") {{"common.time" | translate}}
@@ -129,6 +135,8 @@ html(ng-app="RunAdmin")
               td(ng-bind='run.team.teamCode' ng-if="showCode")
               td(ng-bind='run.team.name' ng-if="showTeam")
               td(ng-bind='run.field.name' ng-if="showField")
+              td(ng-bind='run.originalScore' ng-if="showOriginalScore")
+              td(ng-if="showAdjustment") {{run.adjustment}}%
               td(ng-bind='run.score' ng-if="showScore")
               td(ng-bind='run.normalizedScore' ng-if="showNormalizedScore")
               td(ng-bind="run.time.minutes*60*1000+run.time.seconds*1000 | date:'mm:ss'"  ng-if="showTime")

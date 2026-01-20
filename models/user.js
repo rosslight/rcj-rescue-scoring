@@ -75,6 +75,7 @@ module.exports.ROLE = ROLE;
 var userSchema = new Schema({
   username       : {type: String, required: true, unique: true},
   password       : {type: String, required: true, select: false},
+  email          : {type: String, required: false, select: false},
   salt           : {type: String, select: false},
   admin          : {type: Boolean, default: false}, // deprecated
   superDuperAdmin: {type: Boolean, default: false},
@@ -173,7 +174,8 @@ var DefaultUser = new User({
   username       : process.env.dUsername,
   password       :  process.env.dPassword,
   admin          :  process.env.dAdmin,
-  superDuperAdmin:  process.env.dSDAdmin
+  superDuperAdmin:  process.env.dSDAdmin,
+  email: process.env.dEmail
 });
 
 User.findOne({username: DefaultUser.username}, function (err, dbUser) {
@@ -183,6 +185,7 @@ User.findOne({username: DefaultUser.username}, function (err, dbUser) {
     }
     dbUser.admin = DefaultUser.admin
     dbUser.superDuperAdmin = DefaultUser.superDuperAdmin
+    dbUser.email = DefaultUser.email
     
     //logger.debug(dbUser)
     

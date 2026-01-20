@@ -13,6 +13,7 @@ const { ACCESSLEVELS } = require('../../models/user');
 const competitiondb = require('../../models/competition');
 const { review } = require('../../models/document');
 const { VICTIMS } = require('../../models/mazeMap');
+const Decimal = require('decimal.js');
 
 const MINIMUM_REVIEWER = 5
 
@@ -50,7 +51,7 @@ publicRouter.get('/:competitionId/:leagueId', async function (req, res, next) {
 
   let allRunsDb = await lineRun.find({
     competition: competition
-  }).select("team score normalizationGroup LoPs rescueOrder nl isNL time startTime round")
+  }).select("team score normalizationGroup LoPs rescueOrder nl isNL time startTime round adjustment")
   .populate([
     {
       path: 'team',
@@ -65,6 +66,13 @@ publicRouter.get('/:competitionId/:leagueId', async function (req, res, next) {
   let allRunsLeague = allRunsDb.filter(r => r.team.league == league);
   let allRounds =[...new Set(allRunsLeague.map(r => r.round.name))].sort();
   let allNormGroups =[...new Set(allRunsLeague.map(r => r.normalizationGroup))].sort();
+
+  // Apply score adjustment
+  allRunsLeague.map(run => {
+    if (run.adjustment != null) {
+      run.score = new Decimal(run.score).times((run.adjustment + 100) / 100).toNumber();
+    }
+  });
 
   if (competitiondb.NORMALIZED_RANKING_MODE.includes(rankingMode)) {
     let normGroups = allRunsLeague.map(r => r.normalizationGroup);
@@ -245,7 +253,7 @@ publicRouter.get('/:competitionId/:leagueId', async function (req, res, next) {
 
   let allRunsDb = await mazeRun.find({
     competition: competition
-  }).select("team score normalizationGroup LoPs misidentification foundVictims distKits exitBonus time startTime round")
+  }).select("team score normalizationGroup LoPs misidentification foundVictims distKits exitBonus time startTime round adjustment")
   .populate([
     {
       path: 'team',
@@ -260,6 +268,13 @@ publicRouter.get('/:competitionId/:leagueId', async function (req, res, next) {
   let allRunsLeague = allRunsDb.filter(r => r.team.league == league);
   let allRounds =[...new Set(allRunsLeague.map(r => r.round.name))].sort();
   let allNormGroups =[...new Set(allRunsLeague.map(r => r.normalizationGroup))].sort();
+
+  // Apply score adjustment
+  allRunsLeague.map(run => {
+    if (run.adjustment != null) {
+      run.score = new Decimal(run.score).times((run.adjustment + 100) / 100);
+    }
+  });
 
   if (competitiondb.NORMALIZED_RANKING_MODE.includes(rankingMode)) {
     let normGroups = allRunsLeague.map(r => r.normalizationGroup);
@@ -440,7 +455,7 @@ publicRouter.get('/:competitionId/:leagueId', async function (req, res, next) {
 
   let allRunsDb = await simRun.find({
     competition: competition
-  }).select("team score normalizationGroup time startTime round")
+  }).select("team score normalizationGroup time startTime round adjustment")
   .populate([
     {
       path: 'team',
@@ -455,6 +470,13 @@ publicRouter.get('/:competitionId/:leagueId', async function (req, res, next) {
   let allRunsLeague = allRunsDb.filter(r => r.team.league == league);
   let allRounds =[...new Set(allRunsLeague.map(r => r.round.name))].sort();
   let allNormGroups =[...new Set(allRunsLeague.map(r => r.normalizationGroup))].sort();
+
+  // Apply score adjustment
+  allRunsLeague.map(run => {
+    if (run.adjustment != null) {
+      run.score = new Decimal(run.score).times((run.adjustment + 100) / 100);
+    }
+  });
 
   if (competitiondb.NORMALIZED_RANKING_MODE.includes(rankingMode)) {
     let normGroups = allRunsLeague.map(r => r.normalizationGroup);
@@ -638,9 +660,9 @@ function sortFinalScore(a, b) {
 
 function sum(array) {
   if (array.length == 0) return 0;
-  return array.reduce(function(a,b){
-    return a + b;
-  });
+  return array.reduce(function(a, b) {
+    return Number(a) + Number(b);
+  }, 0);
 }
 
 adminRouter.get('/:competitionId/:leagueId/document', async function (req, res, next) {
@@ -736,15 +758,9 @@ async function getDocumentScore(competitionId, leagueId) {
     team.details = [];
     for (let blockId in questions) {
       let blockScore = 0;
-      let warning = false;
       let blockReviewerNum = [];
       let expectedReviewerNum = [];
       for (let questionId of questions[blockId]) {
-        if (comments[questionId] == null) continue;
-        let ratings = comments[questionId].map(str => parseInt(str));
-        let numReviewer = ratings.length;
-        blockReviewerNum.push(numReviewer);
-
         let expectedReviewerCount = 0;
         if (questionReviewerAssignments[questionId].length == 0) {
           expectedReviewerCount += authorizedUsers.length;
@@ -761,6 +777,15 @@ async function getDocumentScore(competitionId, leagueId) {
           }
         }
         expectedReviewerNum.push(expectedReviewerCount);
+
+        if (comments[questionId] == null) {
+          blockReviewerNum.push(0);
+          continue;
+        }
+
+        let ratings = comments[questionId].map(str => parseInt(str));
+        let numReviewer = ratings.length;
+        blockReviewerNum.push(numReviewer);
 
         let score = 0;
         if (numReviewer >= MINIMUM_REVIEWER) {

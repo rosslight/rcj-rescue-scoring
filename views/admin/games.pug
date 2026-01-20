@@ -89,6 +89,13 @@ block content
               input(type='checkbox' ng-model='Rfields[key]' id="checkF_{{key}}")
               label.checkbox(for="checkF_{{key}}") {{key}}
             hr
+            h6.card-title {{'common.teamCode' | translate}}
+            .input-group
+              .input-group-prepend
+                span.input-group-text
+                  i.fas.fa-users(aria-hidden='true')
+              input.form-control(type='text', placeholder='Team code', aria-label='code', aria-describedby='basic-addon1' ng-model='teamCode')
+            hr
             h6.card-title {{'line.competition.refine.team' | translate}}
             .input-group
               .input-group-prepend
@@ -122,11 +129,18 @@ block content
       div
         button(ng-click="selectAll()" class='btn btn-primary' style="margin: 5px 5px 5px 5px;") {{"admin.lineRun.selectAll" | translate}}
         button(ng-click="removeSelectedRun()" class='btn btn-danger' style="margin: 5px 5px 5px 5px;") {{"admin.lineRun.delS" | translate}}
-        button(ng-hide="league.type == 'simulation'" ng-click="go('/signage/games/'+ competitionId)" class='btn btn-success' style="margin: 5px 5px 5px 5px; text-align:right;") {{"admin.lineRun.monitor" | translate}}
+        button(ng-hide="league.type == 'simulation'" ng-click="go('/signage/games/'+ competitionId + '?league=' + league.type)" class='btn btn-success' style="margin: 5px 5px 5px 5px; text-align:right;") {{"admin.lineRun.monitor" | translate}}
         button(ng-click="go('/admin/' + competitionId +'/' + league.league + '/games/print')" class='btn btn-info' style="margin: 5px 5px 5px 5px; text-align:right;")
           i.fas.fa-print &nbsp;{{"admin.lineRun.printRuns" | translate}}
         button(ng-click="go('/admin/' + competition._id + '/' + league.league + '/games/ranking/')" class='btn btn-info' style="margin: 5px 5px 5px 5px; text-align:right;")
           i.fas.fa-print(aria-hidden='true') &nbsp;[{{league.name}}]&nbsp;{{'admin.lineRun.printRanking' | translate}}
+        button(ng-click="toggleEdit()" class='btn btn-success' style="margin: 5px 5px 5px 5px;")
+          span(ng-show="editMode")
+            i.fas.fa-save 
+            | &nbsp;{{"common.save" | translate}}
+          span(ng-hide="editMode")
+            i.fas.fa-edit 
+            | &nbsp;{{"common.edit" | translate}}
       center
         .loader
           img(src="/images/loader2.gif")
@@ -143,7 +157,7 @@ block content
             th(ng-hide="league.type == 'simulation'") {{"common.map" | translate}}
             th {{"admin.common.normalization_group_id" | translate}}
             th {{"common.score" | translate}}
-            th(ng-if="competition.rankingMode == 'SUM_OF_NORMALIZED_BEST_N_GAMES'") {{"common.normalizedScore" | translate}}
+            th Adjustment
             th {{"common.time" | translate}}
             th {{"admin.lineRun.status" | translate}}
             th {{"common.comment" | translate}}
@@ -151,7 +165,7 @@ block content
         tbody
           tr(ng-repeat='run in runs | filter:list_filter | orderBy:"[startTime,round.name,field.name,team.name]"' runs-read-finished='')
             td
-                input(type='checkbox' ng-model='run.checked' style="display:initial;")
+                input(type='checkbox' ng-model='run.checked' style="display:initial;" tabindex="-1")
             td(ng-bind='run.startTime | date:"dd EEE HH:mm"' ng-style="{'background-color':statusColor(run.status)}" )
             td(ng-bind='run.round.name' ng-style="{'background-color':statusColor(run.status)}" )
             td(ng-bind='run.team.teamCode' ng-style="{'background-color':statusColor(run.status)}")
@@ -159,8 +173,14 @@ block content
             td(ng-bind='run.field.name' ng-style="{'background-color':statusColor(run.status)}")
             td(ng-hide="league.type == 'simulation'" ng-bind='run.map.name' ng-style="{'background-color':statusColor(run.status)}")
             td(ng-bind='run.normalizationGroup' ng-style="{'background-color':statusColor(run.status)}")
-            td(ng-bind='run.score' ng-style="{'background-color':statusColor(run.status)}")
-            td(ng-bind='run.normalizedScore' ng-if="competition.rankingMode == 'SUM_OF_NORMALIZED_BEST_N_GAMES'" ng-style="{'background-color':statusColor(run.status)}") 
+            td(ng-style="{'background-color':statusColor(run.status)}")
+              span {{run.score}}
+              span(ng-show="run.score != run.originalScore" style="font-size:8px;")
+                br
+                | ({{run.originalScore}})
+            td(ng-style="{'background-color':statusColor(run.status)}")
+              span(ng-hide="editMode") {{run.adjustment}} %
+              input(ng-model='run.adjustment' style="width:100%;" ng-show="editMode")
             td(ng-bind="run.time.minutes*60*1000+run.time.seconds*1000 | date:'mm:ss'" ng-style="{'background-color':statusColor(run.status)}")
             td(ng-style="{'background-color':statusColor(run.status)}")
               span(ng-if="run.status==-1") Not yet set check points
@@ -176,7 +196,7 @@ block content
             td(ng-style="{'background-color':statusColor(run.status)}")
               //a(href="" ng-click='removeRun(run._id)') {{"common.delete" | translate}}
               .dropdown
-                  button#dropdownMenu.btn.btn-secondary.dropdown-toggle(type='button', data-toggle='dropdown', aria-haspopup='true', aria-expanded='false') {{"common.action" | translate}}
+                  button#dropdownMenu.btn.btn-secondary.dropdown-toggle(type='button', data-toggle='dropdown', aria-haspopup='true', aria-expanded='false' tabindex="-1") {{"common.action" | translate}}
                   .dropdown-menu(aria-labelledby='dropdownMenu')
                     button.dropdown-item(ng-hide="league.type == 'simulation'" type='button' ng-click="go_scoreSheet2(run._id)") {{"common.generateSheet" | translate}}
                     button.dropdown-item(type='button' ng-click="go('/' + league.type + '/view/' + run._id)") {{"common.view" | translate}}

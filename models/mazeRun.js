@@ -34,6 +34,7 @@ const mazeRunSchema = new Schema({
   group             : {type: Number, min: 0},
   normalizationGroup: {type: String, index: true},
   diceNumber        : {type: Number, default: null},
+  adjustment        : {type: Number, default: 0, min: -100},
 
   tiles    : [{
     x          : {type: Number, integer: true, required: true},

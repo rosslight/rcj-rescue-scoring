@@ -37,8 +37,16 @@ app.controller('ddController', ['$scope', '$uibModal', '$log', '$timeout', '$htt
     $scope.iframeUrl = null;
     $scope.nextGame = null;
     function update() {
-        let gameList = getGameList('line', 2);
-        gameList = gameList.concat(getGameList('maze', 2));
+        let league = new URL(window.location.href).searchParams.get('league') || 'all';
+        let gameList;
+        if (league == 'line') {
+            gameList = getGameList('line', 2);
+        } else if (league == 'maze') {
+            gameList = getGameList('maze', 2);
+        } else {
+            gameList = getGameList('line', 2);
+            gameList = gameList.concat(getGameList('maze', 2));
+        }
         gameList = sortGames(gameList, -1);
         
         if (gameList.length > 0) {
@@ -48,8 +56,14 @@ app.controller('ddController', ['$scope', '$uibModal', '$log', '$timeout', '$htt
             return;
         }
 
-        gameList = getGameList('line', 3);
-        gameList = gameList.concat(getGameList('maze', 3));
+        if (league == 'line') {
+            gameList = getGameList('line', 3);
+        } else if (league == 'maze') {
+            gameList = getGameList('maze', 3);
+        } else {
+            gameList = getGameList('line', 3);
+            gameList = gameList.concat(getGameList('maze', 3));
+        }
         gameList = sortGames(gameList, -1);
 
         if (gameList.length > 0) {
@@ -60,8 +74,14 @@ app.controller('ddController', ['$scope', '$uibModal', '$log', '$timeout', '$htt
         }
 
         $scope.iframeUrl = null;
-        gameList = getGameList('line', 0);
-        gameList = gameList.concat(getGameList('maze', 0));
+        if (league == 'line') {
+            gameList = getGameList('line', 0);
+        } else if (league == 'maze') {
+            gameList = getGameList('maze', 0);
+        } else {
+            gameList = getGameList('line', 0);
+            gameList = gameList.concat(getGameList('maze', 0));
+        }
         gameList = sortGames(gameList);
 
         if (gameList.length > 0) {
@@ -77,4 +97,12 @@ app.controller('ddController', ['$scope', '$uibModal', '$log', '$timeout', '$htt
         update();
         $scope.$apply();
     }, 5000);
+
+    $scope.behindSchedule = function (game) {
+        // Check if the game has a start time and if it is in the past more then 5 minutes
+        if (game.startTime && game.startTime < Date.now() - 5 * 60 * 1000) {
+            return true;
+        }
+        return false;
+    }
 }])

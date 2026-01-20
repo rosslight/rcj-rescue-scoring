@@ -92,11 +92,11 @@ block content
                         strong {{"common.league" | translate}}
                     div(style="font-size:20px;")
                         p(ng-bind="league.name")
-                    hr
-                    div(style="margin-bottom:10px;")
-                        strong {{"common.region" | translate}}
-                    div(style="font-size:20px;")
-                        p(ng-bind="team.country")
+                    //- hr
+                    //- div(style="margin-bottom:10px;")
+                    //-     strong {{"common.region" | translate}}
+                    //- div(style="font-size:20px;")
+                    //-     p(ng-bind="team.country")
             .alert.alert-warning(role='alert', ng-if="maxLength != null")
                 h4.alert-heading {{"document.editor.maxLength" | translate}}:
                     strong(ng-bind="maxLength")
@@ -244,9 +244,3 @@ block content
 
 
                             hr(ng-if="!$last")
-                
-                if editable
-                    div(style="text-align:center;margin-bottom:20px;")
-                        button.btn.btn-lg.btn-outline-success(type='button', ng-click='save()')
-                            i.fas.fa-save &nbsp;
-                            | {{"common.save" | translate}}

@@ -12,6 +12,7 @@ const auth = require('../../helper/authLevels');
 const { ACCESSLEVELS } = require('../../models/user');
 const competitiondb = require('../../models/competition');
 const { VICTIMS } = require('../../models/mazeMap');
+const Decimal = require('decimal.js');
 
 let socketIo;
 
@@ -68,7 +69,7 @@ publicRouter.get('/competition/:competitionId', function (req, res, next) {
     query.select('competition round team field status started startTime sign');
   } else {
     query.select(
-      'competition round team field map score time status started comment startTime sign LoPs exitBonus foundVictims misidentification normalizationGroup'
+      'competition round team field map score time status started comment startTime sign LoPs exitBonus foundVictims misidentification normalizationGroup adjustment'
     );
   }
 
@@ -118,6 +119,14 @@ publicRouter.get('/competition/:competitionId', function (req, res, next) {
           case 2:
             delete run.comment;
             delete run.sign;
+            delete run.adjustment;
+          case 1:
+            run.originalScore = run.score;
+        }
+
+        // Apply score adjustment
+        if (run.adjustment != null) {
+          run.score = new Decimal(run.score).times((run.adjustment + 100) / 100);
         }
 
         if (run.foundVictims) run.foundVictims = run.foundVictims.sort((a,b) => VICTIMS.indexOf(a.type) - VICTIMS.indexOf(b.type));
@@ -344,6 +353,63 @@ publicRouter.get('/:runid', function (req, res, next) {
     }
     return res.status(200).send(dbRun);
   });
+});
+
+adminRouter.put('/bulk', function (req, res) {
+  const updates = req.body;
+  const totalCount = updates.length;
+  let processed = 0;
+  let success = 0;
+
+  for (let u of updates) {
+    mazeRun
+    .findById(u._id)
+    .populate(['competition'])
+    .exec(function (err, dbRun) {
+      if (err) {
+        logger.error(err);
+        res.status(400).send({
+          msg: 'Could not get run',
+          err: err.message,
+        });
+      } else if (dbRun) {
+        if (
+          !auth.authCompetition(
+            req.user,
+            dbRun.competition._id,
+            ACCESSLEVELS.ADMIN
+          )
+        ) {
+          return res.status(401).send({
+            msg: 'You have no authority to access this api!!',
+          });
+        }
+
+        dbRun.adjustment = u.adjustment;
+        
+        dbRun.save(function (err) {
+          processed ++;
+          if (err) {
+            logger.error(err);
+          } else {
+            success++;
+          }
+
+          if (processed == totalCount) {
+            if (totalCount == success) {
+              return res.status(200).send({
+                msg: `All success: ${totalCount}`
+              });
+            } else {
+              return res.status(200).send({
+                msg: `Partial success: ${success}/${totalCount}`
+              });
+            }
+          }
+        });
+      }
+    });
+  }
 });
 
 /**

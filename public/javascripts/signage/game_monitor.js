@@ -25,7 +25,7 @@ app.controller('ddController', ['$scope', '$uibModal', '$log', '$timeout', '$htt
     })
 
     $scope.getIframeSrc = function (field) {
-        return `/signage/field/${competitionId}/${field._id}`;
+        return `/signage/field/${competitionId}/${field._id}?league=${new URL(window.location.href).searchParams.get('league') || 'all'}`;
     };
 
     $scope.range = function (n) {
@@ -52,12 +52,23 @@ app.controller('ddController', ['$scope', '$uibModal', '$log', '$timeout', '$htt
     }
 
     function getFieldOpen(field) {
-        let gameList = getGameList('line', field._id, 2);
-        gameList = gameList.concat(getGameList('maze', field._id, 2));
-        gameList = gameList.concat(getGameList('line', field._id, 3));
-        gameList = gameList.concat(getGameList('maze', field._id, 3));
-
-        return gameList.length;
+        let league = new URL(window.location.href).searchParams.get('league') || 'all'
+        if (league == 'line') {
+            let gameList = getGameList('line', field._id, 2);
+            gameList.concat(getGameList('line', field._id, 3));
+            return gameList.length;
+        } else if (league == 'maze') {
+            let gameList = getGameList('maze', field._id, 2);
+            gameList.concat(getGameList('maze', field._id, 3));
+            return gameList.length;
+        } else {
+            // Get all games for both line and maze
+            let gameList = getGameList('line', field._id, 2);
+            gameList = gameList.concat(getGameList('maze', field._id, 2));
+            gameList = gameList.concat(getGameList('line', field._id, 3));
+            gameList = gameList.concat(getGameList('maze', field._id, 3));
+            return gameList.length;
+        }
     }
 
     function check_selected_field() {
