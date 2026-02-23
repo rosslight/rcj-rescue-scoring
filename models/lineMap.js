@@ -1210,71 +1210,60 @@ const tileTypes = [
   }
 ];
 
-for (var i in tileTypes) {
-  const tileType = new TileType(tileTypes[i])
-  tileType.save(function (err) {
-    if (err) {
-      if (err.code != 11000) { // Ignore duplicate key error
-        logger.error(err)
-      } else {
-        TileType.findById(tileType._id, function (err, dbTileType) {
-          if (err) {
-            logger.error(err)
-          } else if (dbTileType) {
-            dbTileType.image = tileType.image
-            dbTileType.gaps = tileType.gaps
-            dbTileType.intersections = tileType.intersections
-            dbTileType.paths = tileType.paths
-            dbTileType.save(function (err) {
-              if (err) {
-                logger.error(err)
-              }
-            })
-          }
-        })
+for (const tileTypeData of tileTypes) {
+  TileType.updateOne(
+    { _id: tileTypeData._id },
+    {
+      $set: {
+        image: tileTypeData.image,
+        gaps: tileTypeData.gaps,
+        intersections: tileTypeData.intersections,
+        seesaw: tileTypeData.seesaw,
+        paths: tileTypeData.paths,
+      },
+    },
+    { upsert: true, setDefaultsOnInsert: true },
+    function (err) {
+      if (err) {
+        logger.error(err);
       }
     }
-    else {
-      logger.log("saved tiletype")
-    }
-  })
-
+  )
 }
 
-
-if(cluster.isMaster){
+if (cluster.isPrimary) {
   let defaultTileSet = [];
-  for (var i in tileTypes) {
-    const tileType = new TileType(tileTypes[i]);
+  for (const tileTypeData in tileTypes) {
+    const tileType = new TileType(tileTypeData);
     defaultTileSet.push(
       {
         'tileType': tileType._id,
-        'count':100
+        'count': 100,
       }
-    )
+    );
   }
 
-  TileSet.findById('5c19d2439590f2d68b15b302', function (err, dbTileSet) {
-    if(dbTileSet){
+  const defaultTilesetId = '5c19d2439590f2d68b15b302';
+
+  TileSet.findById(defaultTilesetId, function (err, dbTileSet) {
+    if (dbTileSet) {
       dbTileSet.tiles = defaultTileSet;
       dbTileSet.save(function (err) {
         if (err) {
-          logger.error(err)
+          logger.error(err);
         }
-      })
-    }else{
+      });
+    } else {
       let newTileSet = new TileSet({
-        '_id': '5c19d2439590f2d68b15b302',
-        'name': 'Default(2022)',
-        'tiles': defaultTileSet
+        _id: defaultTilesetId,
+        name: 'Default(2022)',
+        tiles: defaultTileSet,
       });
       newTileSet.save(function (err) {
         if (err) {
-          logger.error(err)
+          logger.error(err);
         }
-      })
+      });
     }
   });
 }
-
-
