@@ -1233,7 +1233,7 @@ for (const tileTypeData of tileTypes) {
 
 if (cluster.isPrimary) {
   let defaultTileSet = [];
-  for (const tileTypeData in tileTypes) {
+  for (const tileTypeData of tileTypes) {
     const tileType = new TileType(tileTypeData);
     defaultTileSet.push(
       {
